@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Byudjet daftari</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#157A54">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Byudjet">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#E9ECE8; --surface:#FFFFFF; --surface-2:#F3F5F1;
+    --ink:#17211D; --muted:#5C6862; --line:#D7DCD6;
+    --income:#157A54; --expense:#AF472F; --brass:#A9852C;
+    --shadow:0 1px 2px rgba(23,33,29,.06), 0 8px 24px rgba(23,33,29,.05);
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#11150F; --surface:#191F18; --surface-2:#20271F;
+      --ink:#E9ECE3; --muted:#98A498; --line:#2A322A;
+      --income:#48C08C; --expense:#E5836A; --brass:#D8B458;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#11150F; --surface:#191F18; --surface-2:#20271F;
+    --ink:#E9ECE3; --muted:#98A498; --line:#2A322A;
+    --income:#48C08C; --expense:#E5836A; --brass:#D8B458;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html{scroll-padding-top:env(safe-area-inset-top,0px)}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums; -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:600px; margin:0 auto; padding:20px 18px 120px;}
+  .num{font-variant-numeric:tabular-nums;}
+
+  header.top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px;}
+  .brand{display:flex; flex-direction:column; gap:2px; min-width:0;}
+  .brand h1{font-family:Fraunces,Georgia,serif; font-weight:500; font-size:1.4rem; margin:0; letter-spacing:-.01em;}
+  .brand span{font-size:.8rem; color:var(--muted);}
+  .head-actions{display:flex; gap:8px; align-items:center;}
+  .icon-btn{
+    appearance:none; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+    width:40px; height:40px; border-radius:11px; cursor:pointer; display:grid; place-items:center;
+  }
+  .icon-btn:hover{border-color:var(--brass);}
+  .icon-btn svg{width:19px; height:19px;}
+  .install-btn{
+    appearance:none; border:0; background:var(--income); color:#fff; font:inherit; font-weight:600;
+    font-size:.82rem; padding:9px 13px; border-radius:11px; cursor:pointer;
+  }
+
+  .balances{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;}
+  @media (max-width:420px){ .balances{grid-template-columns:1fr;} }
+  .bal{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 16px 14px; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .bal::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--brass); opacity:.55;}
+  .bal .lbl{font-size:.78rem; color:var(--muted); margin-bottom:6px;}
+  .bal .amt{font-family:Fraunces,Georgia,serif; font-weight:500; font-size:1.7rem; line-height:1.1; letter-spacing:-.02em; word-break:break-word;}
+  .bal .amt.pos{color:var(--income);} .bal .amt.neg{color:var(--expense);}
+  .bal .flow{display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:10px; font-size:.76rem; color:var(--muted);}
+  .bal .flow b{font-weight:600;}
+  .flow .in b{color:var(--income);} .flow .out b{color:var(--expense);}
+
+  .controls{display:flex; gap:8px; margin:4px 0 18px; align-items:center;}
+  select.period{
+    appearance:none; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+    padding:9px 34px 9px 12px; border-radius:11px; font:inherit; font-size:.9rem; font-weight:500; cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235C6862' stroke-width='2' stroke-linecap='round'><path d='M4 6l4 4 4-4'/></svg>");
+    background-repeat:no-repeat; background-position:right 11px center;
+  }
+  .range-note{font-size:.78rem; color:var(--muted);}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);}
+  .chart-card{padding:16px; margin-bottom:16px;}
+  .chart-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .chart-head h2{font-size:.95rem; font-weight:600; margin:0;}
+  .seg{display:inline-flex; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:2px;}
+  .seg button{appearance:none; border:0; background:transparent; color:var(--muted); font:inherit; font-size:.8rem; font-weight:600; padding:5px 11px; border-radius:7px; cursor:pointer;}
+  .seg button.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(23,33,29,.12);}
+  .chart-body{display:flex; align-items:center; gap:18px; margin-top:8px;}
+  @media (max-width:420px){ .chart-body{flex-direction:column;} }
+  .donut{flex:0 0 auto; position:relative;}
+  .donut .center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 26px;}
+  .donut .center .c-amt{font-family:Fraunces,Georgia,serif; font-size:1rem; font-weight:500; line-height:1.15;}
+  .donut .center .c-lbl{font-size:.68rem; color:var(--muted);}
+  .legend{flex:1 1 auto; display:flex; flex-direction:column; gap:7px; min-width:0; width:100%;}
+  .legend .row{display:flex; align-items:center; gap:9px; font-size:.84rem;}
+  .legend .dot{width:10px; height:10px; border-radius:3px; flex:0 0 auto;}
+  .legend .name{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .legend .val{color:var(--muted); font-size:.8rem; white-space:nowrap;}
+
+  .list-head{display:flex; align-items:center; justify-content:space-between; margin:2px 2px 10px;}
+  .list-head h2{font-size:.95rem; font-weight:600; margin:0;}
+  .list-head .count{font-size:.8rem; color:var(--muted);}
+  .txn{display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:13px; background:var(--surface); margin-bottom:8px;}
+  .txn .tag{width:38px; height:38px; border-radius:10px; flex:0 0 auto; display:grid; place-items:center; font-size:1.05rem;}
+  .txn .meta{flex:1 1 auto; min-width:0;}
+  .txn .meta .cat{font-weight:600; font-size:.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .txn .meta .sub{font-size:.76rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .txn .right{display:flex; align-items:center; gap:6px; flex:0 0 auto;}
+  .txn .amt{font-weight:600; font-size:.95rem; white-space:nowrap;}
+  .txn .amt.pos{color:var(--income);} .txn .amt.neg{color:var(--expense);}
+  .txn .del{appearance:none; border:0; background:transparent; color:var(--muted); cursor:pointer; padding:5px; border-radius:8px; line-height:0; font:inherit;}
+  .txn .del svg{width:16px; height:16px;}
+  .txn .del.confirm{background:var(--expense); color:#fff; font-size:.75rem; font-weight:600; line-height:1.2; padding:6px 9px;}
+
+  .empty{text-align:center; color:var(--muted); padding:34px 20px; border:1px dashed var(--line); border-radius:14px; font-size:.9rem;}
+
+  .fab{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom,0px)); display:flex; gap:10px; z-index:30;}
+  .fab button{appearance:none; border:0; cursor:pointer; font:inherit; font-weight:600; font-size:.92rem; padding:13px 20px; border-radius:14px; color:#fff; display:flex; align-items:center; gap:7px; box-shadow:0 6px 20px rgba(23,33,29,.22);}
+  .fab .add-in{background:var(--income);} .fab .add-out{background:var(--expense);}
+  .fab button svg{width:17px; height:17px;}
+
+  .overlay{position:fixed; inset:0; background:rgba(15,20,17,.42); z-index:40; opacity:0; pointer-events:none; transition:opacity .2s;}
+  .overlay.show{opacity:1; pointer-events:auto;}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:50; background:var(--surface);
+    border-radius:22px 22px 0 0; padding:8px 20px calc(24px + env(safe-area-inset-bottom,0px));
+    max-width:600px; margin:0 auto; transform:translateY(105%); transition:transform .24s cubic-bezier(.32,.72,0,1);
+    max-height:92vh; overflow-y:auto;
+  }
+  .sheet.show{transform:translateY(0);}
+  @media (prefers-reduced-motion: reduce){ .sheet,.overlay{transition:none;} }
+  .grab{width:38px; height:4px; border-radius:99px; background:var(--line); margin:6px auto 14px;}
+  .sheet h3{font-family:Fraunces,Georgia,serif; font-weight:500; font-size:1.2rem; margin:0 0 16px;}
+  .field{margin-bottom:15px;}
+  .field > label, .label-row label{display:block; font-size:.8rem; color:var(--muted); margin-bottom:7px;}
+  .label-row{display:flex; justify-content:space-between; align-items:baseline;}
+  .link-btn{appearance:none; border:0; background:none; color:var(--brass); font:inherit; font-size:.82rem; font-weight:600; cursor:pointer; padding:0 2px;}
+  .type-seg, .cur-seg{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .type-seg button, .cur-seg button{appearance:none; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; font-weight:600; font-size:.9rem; padding:11px; border-radius:12px; cursor:pointer;}
+  .type-seg button.on-in{border-color:var(--income); background:color-mix(in srgb, var(--income) 10%, var(--surface)); color:var(--income);}
+  .type-seg button.on-out{border-color:var(--expense); background:color-mix(in srgb, var(--expense) 10%, var(--surface)); color:var(--expense);}
+  .cur-seg button.on{border-color:var(--brass); background:color-mix(in srgb, var(--brass) 12%, var(--surface));}
+  .amt-wrap{position:relative;}
+  .amt-wrap input{width:100%; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font-size:1.5rem; font-weight:600; font-family:Fraunces,Georgia,serif; padding:12px 60px 12px 14px; border-radius:13px; outline:none;}
+  .amt-wrap input:focus{border-color:var(--brass);}
+  .amt-wrap .cur-suffix{position:absolute; right:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;}
+  .chips{display:flex; flex-wrap:wrap; gap:7px;}
+  .chip{appearance:none; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; font-size:.85rem; padding:8px 13px; border-radius:99px; cursor:pointer;}
+  .chip.on{border-color:var(--brass); background:color-mix(in srgb, var(--brass) 14%, var(--surface)); font-weight:600;}
+  .chip.add{border-style:dashed; color:var(--muted);}
+  .chip.edit .x{margin-left:4px; color:var(--expense); font-weight:700;}
+  .chip.danger{border-color:var(--expense); background:var(--expense); color:#fff;}
+  .chip.danger .x{color:#fff;}
+  .newcat{display:grid; grid-template-columns:64px 1fr auto; gap:8px; margin-top:10px;}
+  .txt-input, .date-input{width:100%; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; font-size:.95rem; padding:11px 13px; border-radius:12px; outline:none;}
+  .txt-input:focus, .date-input:focus{border-color:var(--brass);}
+  .emoji-in{text-align:center; font-size:1.1rem;}
+  .mini-btn{appearance:none; border:0; background:var(--ink); color:var(--paper); font:inherit; font-weight:600; font-size:.88rem; padding:0 16px; border-radius:12px; cursor:pointer;}
+  .range-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;}
+  .range-grid label{font-size:.76rem; color:var(--muted); display:block; margin-bottom:4px;}
+  .exp-info{font-size:.85rem; color:var(--muted); margin:4px 0 12px;}
+  .save-btn{width:100%; appearance:none; border:0; cursor:pointer; font:inherit; font-weight:600; font-size:1rem; padding:15px; border-radius:14px; color:#fff; background:var(--ink); margin-top:6px;}
+  .save-btn.in{background:var(--income);} .save-btn.out{background:var(--expense);}
+  .save-btn.dark{background:var(--ink); color:var(--paper);}
+  .save-btn:disabled{opacity:.45; cursor:not-allowed;}
+  button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid var(--brass); outline-offset:2px;}
+  .toast{position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%) translateY(10px); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:11px; font-size:.86rem; font-weight:500; z-index:60; opacity:0; pointer-events:none; transition:.2s; white-space:nowrap;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Byudjet daftari</h1>
+      <span id="storeNote">Yuklanmoqda…</span>
+    </div>
+    <div class="head-actions">
+      <button class="install-btn" id="installBtn" hidden>O'rnatish</button>
+      <button class="icon-btn" id="exportBtn" title="Excelga yuklash" aria-label="Excelga yuklash">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="balances" id="balances"></div>
+
+  <div class="controls">
+    <select class="period" id="periodSel" aria-label="Davr"></select>
+    <span class="range-note" id="rangeNote"></span>
+  </div>
+
+  <div class="card chart-card" id="chartCard" hidden>
+    <div class="chart-head">
+      <h2>Xarajatlar tarkibi</h2>
+      <div class="seg" id="chartCurSeg"></div>
+    </div>
+    <div class="chart-body" id="chartBody"></div>
+  </div>
+
+  <div class="list-head">
+    <h2>Amaliyotlar</h2>
+    <span class="count" id="listCount"></span>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div class="fab">
+  <button class="add-in" data-add="income"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Daromad</button>
+  <button class="add-out" data-add="expense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Xarajat</button>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="sheet" id="addSheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="grab"></div>
+  <h3 id="sheetTitle">Yangi amaliyot</h3>
+  <div class="field">
+    <div class="type-seg" id="typeSeg">
+      <button data-type="income">Daromad</button>
+      <button data-type="expense">Xarajat</button>
+    </div>
+  </div>
+  <div class="field">
+    <label for="amtInput">Miqdor</label>
+    <div class="amt-wrap">
+      <input id="amtInput" inputmode="decimal" placeholder="0" autocomplete="off">
+      <span class="cur-suffix" id="amtSuffix">so'm</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>Valyuta</label>
+    <div class="cur-seg" id="curSeg">
+      <button data-cur="UZS">so'm (UZS)</button>
+      <button data-cur="USD">dollar ($)</button>
+    </div>
+  </div>
+  <div class="field">
+    <div class="label-row"><label>Kategoriya</label><button class="link-btn" id="editCatsBtn">Tahrirlash</button></div>
+    <div class="chips" id="catChips"></div>
+    <div class="newcat" id="newCatRow" hidden>
+      <input id="newCatEmoji" class="txt-input emoji-in" maxlength="4" placeholder="🔖" aria-label="Belgi">
+      <input id="newCatName" class="txt-input" maxlength="24" placeholder="Yangi kategoriya nomi" aria-label="Kategoriya nomi">
+      <button id="newCatAdd" class="mini-btn">Qo'shish</button>
+    </div>
+  </div>
+  <div class="field">
+    <label for="noteInput">Izoh (ixtiyoriy)</label>
+    <input class="txt-input" id="noteInput" placeholder="masalan: bozordan" autocomplete="off">
+  </div>
+  <div class="field">
+    <label for="dateInput">Sana</label>
+    <input type="date" class="date-input" id="dateInput">
+  </div>
+  <button class="save-btn" id="saveBtn">Saqlash</button>
+</div>
+
+<div class="sheet" id="exportSheet" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+  <div class="grab"></div>
+  <h3 id="expTitle">Excelga yuklash</h3>
+  <div class="field">
+    <label>Qaysi davr kerak?</label>
+    <div class="chips" id="expChips"></div>
+    <div class="range-grid" id="expRange" hidden>
+      <div><label for="expFrom">Boshlanishi</label><input type="date" class="date-input" id="expFrom"></div>
+      <div><label for="expTo">Tugashi</label><input type="date" class="date-input" id="expTo"></div>
+    </div>
+  </div>
+  <div class="exp-info" id="expInfo"></div>
+  <button class="save-btn dark" id="expGo">Yuklab olish</button>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+
+  var DEFAULT_CATS = {
+    expense: [
+      {k:"Oziq-ovqat", e:"🍽️"}, {k:"Transport", e:"🚗"}, {k:"Yashash", e:"🏠"},
+      {k:"Kommunal", e:"💡"}, {k:"Aloqa", e:"📱"}, {k:"Kiyim", e:"👕"},
+      {k:"Sog'liq", e:"💊"}, {k:"Ta'lim", e:"📚"}, {k:"Ko'ngilochar", e:"🎬"},
+      {k:"Boshqa", e:"🔖"}
+    ],
+    income: [
+      {k:"Maosh", e:"💼"}, {k:"Qo'shimcha ish", e:"🛠️"}, {k:"Investitsiya", e:"📈"},
+      {k:"Sovg'a", e:"🎁"}, {k:"Boshqa", e:"🔖"}
+    ]
+  };
+  var COLORS = ["#2E7D5B","#C9772F","#3A6EA5","#9C5AA8","#C0913A","#4FA3A0","#B0472F","#7A8450","#8A6D3B","#6C7A89"];
+  var PERIODS = [
+    {k:"today", t:"Bugun"},
+    {k:"week", t:"Bu hafta"},
+    {k:"lastweek", t:"O'tgan hafta"},
+    {k:"month", t:"Bu oy"},
+    {k:"lastmonth", t:"O'tgan oy"},
+    {k:"year", t:"Bu yil"},
+    {k:"all", t:"Hammasi"}
+  ];
+  var MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+
+  var LS_TX = "budget_ledger_v1", LS_CAT = "budget_cats_v1";
+  var db = null, usingDb = false;
+  var txns = [];
+  var cats = clone(DEFAULT_CATS);
+
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+  function lsGet(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+  function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function validCats(c){ return c && Array.isArray(c.expense) && Array.isArray(c.income) && c.expense.length && c.income.length; }
+  function setNote(t){ $("storeNote").textContent = t; }
+
+  // ---------- storage ----------
+  function fallbackLocal(){
+    usingDb = false; db = null;
+    setNote("Shu qurilmada saqlanadi");
+    txns = lsGet(LS_TX, []);
+    var c = lsGet(LS_CAT, null); if(validCats(c)) cats = c;
+    render();
+  }
+
+  async function initStore(){
+    var cap = null;
+    try{ cap = (window.claude && window.claude.use) ? await window.claude.use("db") : null; }catch(e){ cap = null; }
+    if(!cap){ fallbackLocal(); return; }
+    db = cap; usingDb = true; setNote("Bulutda saqlanadi");
+    try{
+      db.collection("transactions").onSnapshot(function(snap){
+        txns = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data() || {}); });
+        render();
+      }, function(){ if(!txns.length) fallbackLocal(); });
+      db.doc("settings/categories").onSnapshot(function(s){
+        if(s.exists){
+          var d = s.data();
+          if(validCats(d)){ cats = {expense:d.expense.slice(), income:d.income.slice()}; render(); if(openSheetId==="addSheet") renderCats(); }
+        }
+      }, function(){});
+    }catch(e){ fallbackLocal(); }
+  }
+
+  async function addTxn(rec){
+    rec.createdAt = Date.now();
+    if(usingDb && db){
+      try{ await db.collection("transactions").add(rec); return; }
+      catch(e){ usingDb = false; setNote("Shu qurilmada saqlanadi"); }
+    }
+    rec.id = "loc_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
+    txns.unshift(rec); lsSet(LS_TX, txns); render();
+  }
+
+  async function delTxn(id){
+    if(usingDb && db && String(id).indexOf("loc_") !== 0){
+      try{ await db.doc("transactions/" + id).delete(); return; }catch(e){}
+    }
+    txns = txns.filter(function(t){ return t.id !== id; });
+    lsSet(LS_TX, txns); render();
+  }
+
+  async function saveCats(){
+    if(usingDb && db){
+      try{ await db.doc("settings/categories").set({expense:cats.expense, income:cats.income}); return; }catch(e){}
+    }
+    lsSet(LS_CAT, cats);
+  }
+
+  // ---------- dates & periods ----------
+  function ds(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+  function todayStr(){ return ds(new Date()); }
+  function addDays(d, n){ return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function monthRange(y, m){ return {from: ds(new Date(y, m, 1)), to: ds(new Date(y, m + 1, 0))}; }
+  function monthLabel(mk){ var p = mk.split("-"); return MONTHS[(parseInt(p[1],10)||1) - 1] + " " + p[0]; }
+
+  function periodRange(k, custom){
+    var n = new Date(), t = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    var mon = addDays(t, -((t.getDay() + 6) % 7));
+    if(k === "all") return null;
+    if(k === "today") return {from: ds(t), to: ds(t)};
+    if(k === "week") return {from: ds(mon), to: ds(addDays(mon, 6))};
+    if(k === "lastweek") return {from: ds(addDays(mon, -7)), to: ds(addDays(mon, -1))};
+    if(k === "month") return monthRange(t.getFullYear(), t.getMonth());
+    if(k === "lastmonth") return monthRange(t.getFullYear(), t.getMonth() - 1);
+    if(k === "year") return {from: t.getFullYear() + "-01-01", to: t.getFullYear() + "-12-31"};
+    if(k.indexOf("m:") === 0){ var p = k.slice(2).split("-"); return monthRange(+p[0], +p[1] - 1); }
+    if(k === "custom" && custom){
+      var a = custom.from || "0000-01-01", b = custom.to || "9999-12-31";
+      if(a > b){ var x = a; a = b; b = x; }
+      return {from: a, to: b};
+    }
+    return null;
+  }
+  function inRange(t, r){ return !r || (t.date >= r.from && t.date <= r.to); }
+  function prettyDate(s){ var p = s.split("-"); return p[2] + "." + p[1] + "." + p[0]; }
+  function rangeText(r){ if(!r) return ""; return r.from === r.to ? prettyDate(r.from) : prettyDate(r.from) + " – " + prettyDate(r.to); }
+
+  // ---------- format ----------
+  function fmt(n, cur){
+    n = Number(n) || 0;
+    if(cur === "USD"){
+      var frac = Math.abs(n % 1) > 0.0001;
+      return "$" + n.toLocaleString("en-US", {minimumFractionDigits: frac ? 2 : 0, maximumFractionDigits: 2});
+    }
+    return Math.round(n).toLocaleString("ru-RU").replace(/\u00A0|\u202F/g, " ") + " so'm";
+  }
+  function fmtSigned(n, cur){ return (n < 0 ? "−" : "+") + fmt(Math.abs(n), cur); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function emojiOf(cat, type){
+    var all = (cats[type] || []).concat(cats.expense, cats.income, DEFAULT_CATS.expense, DEFAULT_CATS.income);
+    for(var i = 0; i < all.length; i++){ if(all[i].k === cat) return all[i].e || "🔖"; }
+    return type === "income" ? "💰" : "🔖";
+  }
+
+  // ---------- view state ----------
+  var period = "month";
+  var chartCur = "UZS";
+  var pendingTxDel = null, pendingTxTimer = null;
+
+  function render(){
+    renderPeriods();
+    var r = periodRange(period);
+    $("rangeNote").textContent = rangeText(r);
+    var list = txns.filter(function(t){ return inRange(t, r); });
+    renderBalances(list);
+    renderChart(list);
+    renderList(list);
+  }
+
+  function renderPeriods(){
+    var sel = $("periodSel");
+    var months = {};
+    txns.forEach(function(t){ if(t.date) months[t.date.slice(0,7)] = true; });
+    var keys = Object.keys(months).sort().reverse();
+    var h = PERIODS.map(function(p){ return '<option value="' + p.k + '">' + esc(p.t) + '</option>'; }).join("");
+    if(keys.length){
+      h += '<optgroup label="Oylar bo‘yicha">' + keys.map(function(mk){ return '<option value="m:' + mk + '">' + monthLabel(mk) + '</option>'; }).join("") + '</optgroup>';
+    }
+    sel.innerHTML = h;
+    if(period.indexOf("m:") === 0 && !months[period.slice(2)]) period = "month";
+    sel.value = period;
+  }
+
+  function totals(list){
+    var t = {UZS:{inc:0, out:0}, USD:{inc:0, out:0}};
+    list.forEach(function(x){
+      var c = x.currency === "USD" ? "USD" : "UZS";
+      if(x.type === "income") t[c].inc += Number(x.amount) || 0; else t[c].out += Number(x.amount) || 0;
+    });
+    return t;
+  }
+
+  function renderBalances(list){
+    var t = totals(list);
+    $("balances").innerHTML = ["UZS","USD"].map(function(c){
+      var bal = t[c].inc - t[c].out;
+      return '<div class="bal">' +
+        '<div class="lbl">' + (c === "UZS" ? "So‘m balansi" : "Dollar balansi") + '</div>' +
+        '<div class="amt num ' + (bal < 0 ? "neg" : "pos") + '">' + fmtSigned(bal, c) + '</div>' +
+        '<div class="flow"><span class="in">kirim <b class="num">' + fmt(t[c].inc, c) + '</b></span>' +
+        '<span class="out">chiqim <b class="num">' + fmt(t[c].out, c) + '</b></span></div>' +
+      '</div>';
+    }).join("");
+  }
+
+  function renderChart(list){
+    var card = $("chartCard");
+    var has = {UZS:false, USD:false};
+    list.forEach(function(x){ if(x.type === "expense") has[x.currency === "USD" ? "USD" : "UZS"] = true; });
+    var avail = ["UZS","USD"].filter(function(k){ return has[k]; });
+    if(!avail.length){ card.hidden = true; return; }
+    if(avail.indexOf(chartCur) === -1) chartCur = avail[0];
+    card.hidden = false;
+    var seg = $("chartCurSeg");
+    seg.hidden = avail.length < 2;
+    seg.innerHTML = avail.map(function(c){
+      return '<button data-ccur="' + c + '" class="' + (c === chartCur ? "on" : "") + '">' + (c === "UZS" ? "so‘m" : "$") + '</button>';
+    }).join("");
+
+    var g = {};
+    list.forEach(function(x){
+      if(x.type !== "expense" || (x.currency === "USD" ? "USD" : "UZS") !== chartCur) return;
+      g[x.category] = (g[x.category] || 0) + (Number(x.amount) || 0);
+    });
+    var entries = Object.keys(g).map(function(k){ return {k:k, v:g[k]}; }).sort(function(a,b){ return b.v - a.v; });
+    var total = entries.reduce(function(s,e){ return s + e.v; }, 0);
+    var R = 54, TH = 16, C = 2 * Math.PI * R, off = 0, segs = "";
+    entries.forEach(function(e, i){
+      var len = total > 0 ? e.v / total * C : 0;
+      segs += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + COLORS[i % COLORS.length] + '" stroke-width="' + TH + '" stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 70 70)"></circle>';
+      off += len;
+    });
+    var legend = entries.map(function(e, i){
+      var pct = total > 0 ? Math.round(e.v / total * 100) : 0;
+      return '<div class="row"><span class="dot" style="background:' + COLORS[i % COLORS.length] + '"></span>' +
+        '<span class="name">' + esc(emojiOf(e.k, "expense")) + ' ' + esc(e.k) + '</span>' +
+        '<span class="val num">' + fmt(e.v, chartCur) + ' · ' + pct + '%</span></div>';
+    }).join("");
+    $("chartBody").innerHTML =
+      '<div class="donut" style="width:140px;height:140px"><svg width="140" height="140" viewBox="0 0 140 140">' +
+      '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="var(--line)" stroke-width="' + TH + '"></circle>' + segs + '</svg>' +
+      '<div class="center"><div class="c-amt num">' + fmt(total, chartCur) + '</div><div class="c-lbl">jami xarajat</div></div></div>' +
+      '<div class="legend">' + legend + '</div>';
+  }
+
+  function renderList(list){
+    var box = $("list");
+    $("listCount").textContent = list.length ? list.length + " ta" : "";
+    if(!list.length){
+      box.innerHTML = '<div class="empty">Bu davrda amaliyot yo‘q.<br>Pastdagi tugmalar bilan daromad yoki xarajat qo‘shing.</div>';
+      return;
+    }
+    var sorted = list.slice().sort(function(a,b){
+      if(a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    box.innerHTML = sorted.map(function(t){
+      var isIn = t.type === "income";
+      var col = isIn ? "var(--income)" : "var(--expense)";
+      var sub = [t.date ? prettyDate(t.date) : "", t.note].filter(Boolean).join("  ·  ");
+      var pend = pendingTxDel === t.id;
+      var delBtn = pend
+        ? '<button class="del confirm" data-del="' + esc(t.id) + '">O‘chirish</button>'
+        : '<button class="del" data-del="' + esc(t.id) + '" aria-label="O‘chirish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg></button>';
+      return '<div class="txn">' +
+        '<div class="tag" style="background:color-mix(in srgb, ' + col + ' 14%, var(--surface))">' + esc(emojiOf(t.category, t.type)) + '</div>' +
+        '<div class="meta"><div class="cat">' + esc(t.category) + '</div>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div>' +
+        '<div class="right"><div class="amt num ' + (isIn ? "pos" : "neg") + '">' + fmtSigned(isIn ? Number(t.amount) : -Number(t.amount), t.currency) + '</div>' + delBtn + '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  // ---------- sheets ----------
+  var openSheetId = null;
+  function showSheet(id){ openSheetId = id; $("overlay").classList.add("show"); $(id).classList.add("show"); }
+  function hideSheet(){
+    if(!openSheetId) return;
+    $(openSheetId).classList.remove("show"); $("overlay").classList.remove("show");
+    openSheetId = null; editCats = false; showNewCat = false; pendingCatDel = -1;
+  }
+  $("overlay").addEventListener("click", hideSheet);
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") hideSheet(); });
+
+  // ---------- add sheet ----------
+  var draft = {type:"expense", currency:"UZS", category:null};
+  var editCats = false, showNewCat = false, pendingCatDel = -1;
+
+  function openAdd(type){
+    draft = {type:type, currency: draft.currency || "UZS", category:null};
+    editCats = false; showNewCat = false; pendingCatDel = -1;
+    $("sheetTitle").textContent = type === "income" ? "Yangi daromad" : "Yangi xarajat";
+    $("amtInput").value = ""; $("noteInput").value = ""; $("dateInput").value = todayStr();
+    syncType(); syncCur(); renderCats(); updateSave();
+    showSheet("addSheet");
+    setTimeout(function(){ $("amtInput").focus(); }, 260);
+  }
+  function syncType(){
+    document.querySelectorAll("#typeSeg button").forEach(function(b){
+      b.className = b.dataset.type === draft.type ? (draft.type === "income" ? "on-in" : "on-out") : "";
+    });
+    var sb = $("saveBtn");
+    sb.className = "save-btn " + (draft.type === "income" ? "in" : "out");
+    sb.textContent = draft.type === "income" ? "Daromadni saqlash" : "Xarajatni saqlash";
+  }
+  function syncCur(){
+    document.querySelectorAll("#curSeg button").forEach(function(b){ b.className = b.dataset.cur === draft.currency ? "on" : ""; });
+    $("amtSuffix").textContent = draft.currency === "USD" ? "$" : "so‘m";
+  }
+  function renderCats(){
+    var list = cats[draft.type];
+    var h = list.map(function(c, i){
+      if(editCats){
+        var pend = pendingCatDel === i;
+        return '<button class="chip edit' + (pend ? " danger" : "") + '" data-ci="' + i + '">' + esc(c.e || "") + ' ' + esc(c.k) + '<span class="x">' + (pend ? " o‘chirilsinmi?" : " ×") + '</span></button>';
+      }
+      return '<button class="chip' + (draft.category === c.k ? " on" : "") + '" data-ci="' + i + '">' + esc(c.e || "") + ' ' + esc(c.k) + '</button>';
+    }).join("");
+    if(!editCats) h += '<button class="chip add" data-newcat="1">+ Yangi</button>';
+    $("catChips").innerHTML = h;
+    $("editCatsBtn").textContent = editCats ? "Tayyor" : "Tahrirlash";
+    $("newCatRow").hidden = !showNewCat || editCats;
+  }
+  function parseAmt(){
+    var n = parseFloat($("amtInput").value.replace(/\s/g, "").replace(",", "."));
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+  function updateSave(){ $("saveBtn").disabled = !(parseAmt() > 0 && draft.category); }
+
+  $("typeSeg").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    draft.type = b.dataset.type; draft.category = null; editCats = false; showNewCat = false; pendingCatDel = -1;
+    $("sheetTitle").textContent = draft.type === "income" ? "Yangi daromad" : "Yangi xarajat";
+    syncType(); renderCats(); updateSave();
+  });
+  $("curSeg").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    draft.currency = b.dataset.cur; syncCur();
+  });
+  $("editCatsBtn").addEventListener("click", function(){
+    editCats = !editCats; pendingCatDel = -1; showNewCat = false; renderCats();
+  });
+  $("catChips").addEventListener("click", async function(e){
+    if(e.target.closest("[data-newcat]")){
+      showNewCat = !showNewCat; renderCats();
+      if(showNewCat) setTimeout(function(){ $("newCatName").focus(); }, 50);
+      return;
+    }
+    var b = e.target.closest("[data-ci]"); if(!b) return;
+    var i = +b.dataset.ci, list = cats[draft.type];
+    if(editCats){
+      if(pendingCatDel !== i){ pendingCatDel = i; renderCats(); return; }
+      if(list.length <= 1){ pendingCatDel = -1; renderCats(); toast("Kamida bitta kategoriya qolishi kerak"); return; }
+      var removed = list[i];
+      cats[draft.type] = list.filter(function(_, j){ return j !== i; });
+      if(draft.category === removed.k) draft.category = null;
+      pendingCatDel = -1; renderCats(); updateSave();
+      await saveCats();
+      toast("«" + removed.k + "» o‘chirildi");
+      return;
+    }
+    draft.category = list[i].k; renderCats(); updateSave();
+  });
+  async function addCat(){
+    var name = $("newCatName").value.trim().replace(/\s+/g, " ");
+    if(!name){ $("newCatName").focus(); return; }
+    var list = cats[draft.type];
+    if(list.some(function(c){ return c.k.toLowerCase() === name.toLowerCase(); })){ toast("Bunday kategoriya bor"); return; }
+    var emo = $("newCatEmoji").value.trim() || "🔖";
+    cats[draft.type] = list.concat([{k:name, e:emo}]);
+    draft.category = name; showNewCat = false;
+    $("newCatName").value = ""; $("newCatEmoji").value = "";
+    renderCats(); updateSave();
+    await saveCats();
+    toast("Kategoriya qo‘shildi");
+  }
+  $("newCatAdd").addEventListener("click", addCat);
+  $("newCatName").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); addCat(); } });
+  $("amtInput").addEventListener("input", updateSave);
+
+  $("saveBtn").addEventListener("click", async function(){
+    var amt = parseAmt(); if(!(amt > 0) || !draft.category) return;
+    var type = draft.type;
+    var rec = {type:type, amount:amt, currency:draft.currency, category:draft.category,
+               note:$("noteInput").value.trim(), date:$("dateInput").value || todayStr()};
+    this.disabled = true;
+    await addTxn(rec);
+    hideSheet();
+    toast(type === "income" ? "Daromad qo‘shildi" : "Xarajat qo‘shildi");
+  });
+  document.querySelectorAll("[data-add]").forEach(function(b){
+    b.addEventListener("click", function(){ openAdd(b.dataset.add); });
+  });
+
+  // ---------- list / chart / period events ----------
+  $("list").addEventListener("click", function(e){
+    var d = e.target.closest("[data-del]"); if(!d) return;
+    var id = d.dataset.del;
+    clearTimeout(pendingTxTimer);
+    if(pendingTxDel === id){ pendingTxDel = null; delTxn(id); toast("O‘chirildi"); return; }
+    pendingTxDel = id; render();
+    pendingTxTimer = setTimeout(function(){ pendingTxDel = null; render(); }, 3000);
+  });
+  $("chartCurSeg").addEventListener("click", function(e){
+    var b = e.target.closest("[data-ccur]"); if(!b) return;
+    chartCur = b.dataset.ccur; render();
+  });
+  $("periodSel").addEventListener("change", function(e){ period = e.target.value; render(); });
+
+  // ---------- export ----------
+  var expKey = "month";
+  function getCustom(){ return {from:$("expFrom").value, to:$("expTo").value}; }
+  function openExport(){
+    if(!txns.length){ toast("Hali amaliyot yo‘q"); return; }
+    expKey = period;
+    var n = new Date();
+    $("expFrom").value = ds(new Date(n.getFullYear(), n.getMonth(), 1));
+    $("expTo").value = todayStr();
+    renderExport();
+    showSheet("exportSheet");
+  }
+  function renderExport(){
+    var opts = PERIODS.slice();
+    if(expKey.indexOf("m:") === 0) opts.unshift({k:expKey, t:monthLabel(expKey.slice(2))});
+    opts.push({k:"custom", t:"Boshqa davr…"});
+    $("expChips").innerHTML = opts.map(function(p){
+      return '<button class="chip' + (p.k === expKey ? " on" : "") + '" data-ek="' + p.k + '">' + esc(p.t) + '</button>';
+    }).join("");
+    $("expRange").hidden = expKey !== "custom";
+    var r = periodRange(expKey, getCustom());
+    var cnt = txns.filter(function(t){ return inRange(t, r); }).length;
+    $("expInfo").textContent = (r ? rangeText(r) : "Barcha davr") + ": " + cnt + " ta amaliyot";
+    $("expGo").disabled = cnt === 0;
+  }
+  $("expChips").addEventListener("click", function(e){
+    var b = e.target.closest("[data-ek]"); if(!b) return;
+    expKey = b.dataset.ek; renderExport();
+  });
+  $("expFrom").addEventListener("change", renderExport);
+  $("expTo").addEventListener("change", renderExport);
+  $("exportBtn").addEventListener("click", openExport);
+
+  $("expGo").addEventListener("click", async function(){
+    var r = periodRange(expKey, getCustom());
+    var sel = txns.filter(function(t){ return inRange(t, r); })
+      .sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt||0) - (b.createdAt||0); });
+    var head = ["Sana","Turi","Kategoriya","Miqdor","Valyuta","Izoh"];
+    var rows = sel.map(function(t){
+      return [t.date ? prettyDate(t.date) : "", t.type === "income" ? "Daromad" : "Xarajat", t.category || "",
+              Number(t.amount) || 0, t.currency === "USD" ? "USD" : "UZS", t.note || ""];
+    });
+    var sum = {}, tot = {UZS:{inc:0,out:0}, USD:{inc:0,out:0}};
+    rows.forEach(function(x){
+      var key = x[4] + "|" + x[1] + "|" + x[2];
+      sum[key] = (sum[key] || 0) + x[3];
+      if(x[1] === "Daromad") tot[x[4]].inc += x[3]; else tot[x[4]].out += x[3];
+    });
+    var summ = [["Davr", r ? rangeText(r) : "Barcha davr"], [], ["Valyuta","Turi","Kategoriya","Jami"]];
+    Object.keys(sum).sort().forEach(function(k){ var p = k.split("|"); summ.push([p[0], p[1], p[2], sum[k]]); });
+    summ.push([], ["Valyuta","Kirim","Chiqim","Balans"]);
+    ["UZS","USD"].forEach(function(c){ if(tot[c].inc || tot[c].out) summ.push([c, tot[c].inc, tot[c].out, tot[c].inc - tot[c].out]); });
+    var tag = r ? (r.from === r.to ? r.from : r.from + "_" + r.to) : "hammasi";
+
+    var btn = this; btn.disabled = true;
+    try{
+      if(window.XLSX){
+        var wb = XLSX.utils.book_new();
+        var ws1 = XLSX.utils.aoa_to_sheet([head].concat(rows));
+        ws1["!cols"] = [{wch:12},{wch:10},{wch:18},{wch:14},{wch:8},{wch:28}];
+        var ws2 = XLSX.utils.aoa_to_sheet(summ);
+        ws2["!cols"] = [{wch:12},{wch:14},{wch:18},{wch:16}];
+        XLSX.utils.book_append_sheet(wb, ws1, "Amaliyotlar");
+        XLSX.utils.book_append_sheet(wb, ws2, "Xulosa");
+        await deliver("byudjet_" + tag + ".xlsx", XLSX.write(wb, {type:"array", bookType:"xlsx"}));
+      }else{
+        await deliver("byudjet_" + tag + ".csv", toCSV([head].concat(rows)));
+      }
+      hideSheet();
+    }catch(err){
+      if(!(err && err.code === "declined")) toast("Yuklab bo‘lmadi");
+    }finally{ btn.disabled = false; }
+  });
+
+  function toCSV(aoa){
+    var q = function(v){ v = String(v); return /[";\n,]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    return "\ufeff" + aoa.map(function(r){ return r.map(q).join(";"); }).join("\n");
+  }
+  async function deliver(filename, data){
+    var dl = null;
+    try{ dl = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null; }catch(e){ dl = null; }
+    if(dl){
+      var res = await dl.save({filename:filename, data:data});
+      if(res && res.status === "saved") toast("Fayl saqlandi");
+      return;
+    }
+    var type = /\.xlsx$/.test(filename) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv";
+    var url = URL.createObjectURL(new Blob([data], {type:type}));
+    var a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    toast("Fayl yuklandi");
+  }
+
+  // ---------- install (phone app) ----------
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); deferredPrompt = e; $("installBtn").hidden = false; });
+  $("installBtn").addEventListener("click", async function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try{ await deferredPrompt.userChoice; }catch(e){}
+    deferredPrompt = null; $("installBtn").hidden = true;
+  });
+  window.addEventListener("appinstalled", function(){ $("installBtn").hidden = true; toast("Ilova o‘rnatildi"); });
+
+  // ---------- toast ----------
+  var toastT = null;
+  function toast(msg){
+    var el = $("toast"); el.textContent = msg; el.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(function(){ el.classList.remove("show"); }, 2000);
+  }
+
+  if("serviceWorker" in navigator && location.protocol === "https:"){ navigator.serviceWorker.register("sw.js").catch(function(){}); }
+  if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(function(){}); }
+  render();
+  initStore();
+})();
+</script>
+</body>
+</html>
